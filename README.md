@@ -3,24 +3,24 @@
 > Built for the Spreetail Software Engineering Intern assignment.  
 > A shared expenses app for flatmates with messy data, built with Django + React.
 
-## 🚀 Live Demo
+## Live Demo
 
 **Deployed URL:** _[Will be added after deployment]_
 
-## 📋 Overview
+## Overview
 
 FairShare helps a group of flatmates (Aisha, Rohan, Priya, Meera, Dev, Sam) track shared expenses, import messy CSV data, detect anomalies, calculate balances, and settle debts. Built to handle real-world data problems — not just happy paths.
 
 ### Key Features
 
 - **Smart CSV Import** — Detects 14+ data anomalies (duplicates, missing fields, math errors, membership violations) and surfaces them for user review
-- **Multi-Currency Support** — USD ↔ INR conversion via ExchangeRate-API with rate caching
+- **Multi-Currency Support** — USD/INR conversion via ExchangeRate-API with rate caching
 - **Flexible Splitting** — Equal, unequal, percentage, and share-based expense splitting
 - **Membership Timeline** — Tracks when members join/leave — Sam's April expenses don't affect Meera's March balance
 - **Debt Simplification** — Minimizes the number of transactions needed to settle up
 - **Import Reports** — Every anomaly detected during CSV import is logged with the action taken
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 | Layer | Technology |
 |-------|-----------|
@@ -33,7 +33,7 @@ FairShare helps a group of flatmates (Aisha, Rohan, Priya, Meera, Dev, Sam) trac
 | Currency API | ExchangeRate-API |
 | Deployment | Render.com |
 
-## 🏗️ Setup Instructions
+## Setup Instructions
 
 ### Prerequisites
 
@@ -83,13 +83,13 @@ ALLOWED_HOSTS=localhost,127.0.0.1
 CORS_ALLOWED_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
 ```
 
-## 🤖 AI Tools Used
+## AI Tools Used
 
 See [AI_USAGE.md](./AI_USAGE.md) for detailed documentation of AI tools used, key prompts, and cases where AI produced incorrect output.
 
 **Primary tool:** Claude (Anthropic) — used as a development collaborator for architecture decisions, code generation, and debugging. Every line was reviewed and understood by the developer.
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 ├── backend/              # Django REST API
@@ -110,7 +110,7 @@ See [AI_USAGE.md](./AI_USAGE.md) for detailed documentation of AI tools used, ke
 └── Expenses Export.csv   # Original data file
 ```
 
-## 📄 Other Documentation
+## Other Documentation
 
 - [SCOPE.md](./SCOPE.md) — Every data anomaly found and how it was handled + database schema
 - [DECISIONS.md](./DECISIONS.md) — Each significant decision with options considered
