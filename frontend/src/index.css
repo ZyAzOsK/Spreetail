@@ -1,0 +1,6 @@
+/* Global resets — will be expanded in Phase 3 */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
