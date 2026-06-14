@@ -10,19 +10,12 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const cardRef = useRef(null);
-  const glowRef = useRef(null);
 
   useEffect(() => {
-    // Card entrance animation
     gsap.fromTo(
       cardRef.current,
       { y: 30, opacity: 0 },
       { y: 0, opacity: 1, duration: 0.6, ease: 'power3.out' }
-    );
-    gsap.fromTo(
-      glowRef.current,
-      { scale: 0.8, opacity: 0 },
-      { scale: 1, opacity: 1, duration: 1.2, ease: 'power2.out' }
     );
   }, []);
 
@@ -53,9 +46,6 @@ export default function LoginPage() {
 
   return (
     <div className="auth-container">
-      <div className="auth-bg-glow" ref={glowRef} />
-      <div className="auth-bg-glow-2" />
-
       <div className="auth-card" ref={cardRef}>
         {/* Logo */}
         <div className="auth-logo">

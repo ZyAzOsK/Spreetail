@@ -76,9 +76,6 @@ export default function RegisterPage() {
 
   return (
     <div className="auth-container">
-      <div className="auth-bg-glow" />
-      <div className="auth-bg-glow-2" />
-
       <div className="auth-card" ref={cardRef}>
         <div className="auth-logo">
           <div className="auth-logo-icon">F</div>
