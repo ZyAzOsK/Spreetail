@@ -7,6 +7,7 @@ import { groupsApi, expensesApi, balancesApi, settlementsApi } from '../services
 import ExpenseModal from '../components/ExpenseModal';
 import AddMemberModal from '../components/AddMemberModal';
 import SettleModal from '../components/SettleModal';
+import ImportWizard from '../components/ImportWizard';
 
 // ---- Sub-components ----
 
@@ -134,6 +135,7 @@ export default function GroupDetailPage() {
   const [showExpenseModal, setShowExpenseModal] = useState(false);
   const [showAddMemberModal, setShowAddMemberModal] = useState(false);
   const [showSettleModal, setShowSettleModal] = useState(false);
+  const [showImportWizard, setShowImportWizard] = useState(false);
 
   const groupId = parseInt(id);
 
@@ -208,6 +210,13 @@ export default function GroupDetailPage() {
           {group.description && <p className="text-muted mt-sm">{group.description}</p>}
         </div>
         <div className="flex gap-sm">
+          <button
+            className="btn btn-secondary btn-sm"
+            id="import-csv-btn"
+            onClick={() => setShowImportWizard(true)}
+          >
+            Import CSV
+          </button>
           <button
             className="btn btn-secondary btn-sm"
             id="add-member-btn"
@@ -289,6 +298,13 @@ export default function GroupDetailPage() {
       </div>
 
       {/* Modals */}
+      {showImportWizard && (
+        <ImportWizard
+          group={group}
+          onClose={() => setShowImportWizard(false)}
+          onComplete={() => { setShowImportWizard(false); loadAll(); }}
+        />
+      )}
       {showExpenseModal && (
         <ExpenseModal
           group={group}

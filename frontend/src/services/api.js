@@ -90,4 +90,19 @@ export const currencyApi = {
     api.get(`/expenses/exchange-rate/?from=${from}&to=${to}`),
 };
 
-export default api;
+// ===== IMPORT =====
+export const importApi = {
+  upload: (groupId, formData) =>
+    api.post(`/import/${groupId}/upload/`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }),
+  listReports: (groupId) => api.get(`/import/${groupId}/reports/`),
+  getReport: (groupId, reportId) => api.get(`/import/${groupId}/reports/${reportId}/`),
+  resolveAnomaly: (groupId, reportId, anomalyId, data) =>
+    api.patch(`/import/${groupId}/reports/${reportId}/anomalies/${anomalyId}/`, data),
+  approveAuto: (groupId, reportId) =>
+    api.post(`/import/${groupId}/reports/${reportId}/approve-auto/`),
+  finalize: (groupId, reportId, rowDecisions) =>
+    api.post(`/import/${groupId}/reports/${reportId}/finalize/`, { row_decisions: rowDecisions }),
+};
+
