@@ -158,7 +158,7 @@ def parse_date(raw: str) -> tuple[Optional[date], Optional[DetectedAnomaly]]:
             # Check if ambiguous: day <= 12 (could be month)
             if fmt == '%d-%m-%Y' and parsed.day <= 12:
                 return parsed, DetectedAnomaly(
-                    anomaly_type='date_error', severity='info',
+                    anomaly_type='date_normalized', severity='info',
                     field_name='date',
                     description=(
                         f'Parsed using document format DD-MM-YYYY: {parsed.strftime("%d %b %Y")}.'
@@ -177,7 +177,7 @@ def parse_date(raw: str) -> tuple[Optional[date], Optional[DetectedAnomaly]]:
             parsed_no_year = datetime.strptime(raw, fmt)
             guessed = parsed_no_year.replace(year=2026).date()
             return guessed, DetectedAnomaly(
-                anomaly_type='date_error', severity='info',
+                anomaly_type='date_normalized', severity='info',
                 field_name='date',
                 description=f'Date "{raw}" is missing a year. Assumed 2026: {guessed.isoformat()}.',
                 original_value=raw,
@@ -316,11 +316,13 @@ def check_percentage_sum(split_details: dict) -> Optional[DetectedAnomaly]:
     total = sum(split_details.values())
     if abs(total - 100) > 0.01:
         normalized = {k: round(v / total * 100, 2) for k, v in split_details.items()}
+        orig_str = " / ".join(str(v) for v in split_details.values())
+        norm_str = " / ".join(str(v) for v in normalized.values())
         return DetectedAnomaly(
             anomaly_type='math_error', severity='warning',
             field_name='split_details',
-            description=f'Percentages sum to {total}%, not 100%. '
-                        f'Will be normalized proportionally.',
+            description=(f'Percentages sum to {total}%.\nScale factor = 100 / {total}.\n'
+                         f'Original: {orig_str}\nNormalized: {norm_str}'),
             original_value=str(dict(split_details)),
             suggested_value=str(normalized),
             suggested_action='Percentages auto-normalized. Approve to continue.',
@@ -428,14 +430,13 @@ def parse_csv(csv_text: str, membership_timeline: dict = None) -> list[ParsedRow
         if not currency_raw:
             row.currency = 'INR'
             row.anomalies.append(DetectedAnomaly(
-                anomaly_type='currency_missing', severity='warning',
+                anomaly_type='currency_normalized', severity='info',
                 field_name='currency',
                 description='Currency missing. Defaulted to INR.',
                 original_value='',
                 suggested_value='INR',
                 auto_fixed=True,
             ))
-            row.needs_review = True
         else:
             row.currency = currency_raw.upper()
 
@@ -617,6 +618,27 @@ def parse_csv(csv_text: str, membership_timeline: dict = None) -> list[ParsedRow
         row.needs_review = any(a.severity in ('warning', 'error', 'critical') for a in row.anomalies)
 
         rows.append(row)
+
+    # Deduplicate guest member warnings across the file
+    guest_mentions = {}
+    for row in rows:
+        for a in row.anomalies:
+            if a.anomaly_type == 'name_mismatch' and a.severity == 'warning' and 'Guest member' in a.description:
+                guest_mentions.setdefault(a.original_value, []).append(row)
+
+    for name, guest_rows in guest_mentions.items():
+        if len(guest_rows) > 1:
+            row_nums = ", ".join(str(r.row_number) for r in guest_rows)
+            # Update the description on the FIRST row
+            first_row = guest_rows[0]
+            for a in first_row.anomalies:
+                if a.anomaly_type == 'name_mismatch' and a.original_value == name:
+                    a.description = f'Guest member detected: {name}\nReferenced in rows: {row_nums}'
+            
+            # Remove the anomaly from subsequent rows and recalculate needs_review
+            for r in guest_rows[1:]:
+                r.anomalies = [a for a in r.anomalies if not (a.anomaly_type == 'name_mismatch' and a.original_value == name)]
+                r.needs_review = any(a.severity in ('warning', 'error', 'critical') for a in r.anomalies)
 
     return rows
 
