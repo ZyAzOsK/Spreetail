@@ -86,23 +86,29 @@ If you are evaluating this assignment, here is exactly how to run through the co
 
 ## Deployment Instructions
 
-### Deploying the Django Backend to Render.com
+### 1. Deploying the PostgreSQL Database (Render.com)
+1. Sign up for [Render.com](https://render.com/).
+2. Click **New +** -> **PostgreSQL**.
+3. Name it (e.g., `spreetail-db`), select the Free tier, and click **Create Database**.
+4. Once created, scroll down and copy the **Internal Database URL**.
+
+### 2. Deploying the Django Backend (Render.com)
 1. Create a GitHub repository and push this codebase.
-2. Sign up for [Render.com](https://render.com/).
-3. Click **New +** -> **Web Service**.
-4. Connect your GitHub account and select your repository.
-5. Set the following details:
+2. In your Render Dashboard, click **New +** -> **Web Service**.
+3. Connect your GitHub account and select your repository.
+4. Set the following details:
    - **Root Directory**: `backend`
    - **Environment**: `Python`
    - **Build Command**: `pip install -r requirements.txt && python manage.py migrate`
    - **Start Command**: `gunicorn config.wsgi`
-6. Add Environment Variables:
-   - `DJANGO_SECRET_KEY`: (generate a secure random string)
-   - `EXCHANGE_RATE_API_KEY`: (your ExchangeRate-API key)
-   - `CORS_ALLOWED_ORIGINS`: (the URL where you will deploy your frontend, e.g., `https://spreetail-frontend.vercel.app`)
-7. Click **Create Web Service**.
+5. Add Environment Variables:
+   - `DATABASE_URL`: *(paste the Internal Database URL from Step 1)*
+   - `DJANGO_SECRET_KEY`: *(generate a secure random string)*
+   - `EXCHANGE_RATE_API_KEY`: *(your ExchangeRate-API key)*
+   - `CORS_ALLOWED_ORIGINS`: *(the URL where you will deploy your frontend, e.g., `https://spreetail-frontend.vercel.app`)*
+6. Click **Create Web Service**.
 
-### Deploying the Vite Frontend to Vercel
+### 3. Deploying the Vite Frontend (Vercel)
 1. Sign up for [Vercel](https://vercel.com/).
 2. Click **Add New** -> **Project**.
 3. Import your GitHub repository.
