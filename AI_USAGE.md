@@ -83,4 +83,15 @@ During code review, I realized that if Aisha paid for a ₹500 Uber ride, and th
 **What I changed:**
 I expanded the duplicate detection hashing function in `importer/anomaly_detector.py` to also normalize and include the `description` text and the `split_with` participants array. This ensures that only true duplicates (like the "Thalassa" double entry) are caught, preventing false positives.
 
+### Case 4: Over-Aggressive Duplicate Warnings for Guests
+
+**What AI produced:**
+The AI originally flagged "Guest member Dev detected" as a warning on every single row that Dev appeared in.
+
+**How I caught it:**
+During review, the UI was heavily cluttered with the exact same warning repeated seven times (for rows 5, 20, 21, 22, 23, 24, and 26).
+
+**What I changed:**
+I refactored the parser to include a deduplication pass. It now aggregates the warning onto the first appearance (e.g., Row 5), lists all the rows the guest appears in, and seamlessly processes the subsequent rows without throwing redundant noise.
+
 ---
