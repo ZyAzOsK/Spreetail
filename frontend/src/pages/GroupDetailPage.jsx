@@ -8,17 +8,23 @@ import ExpenseModal from '../components/ExpenseModal';
 import AddMemberModal from '../components/AddMemberModal';
 import SettleModal from '../components/SettleModal';
 import ImportWizard from '../components/ImportWizard';
+import BalanceBreakdownModal from '../components/BalanceBreakdownModal';
 
 // ---- Sub-components ----
 
-function BalanceSummary({ balances, simplified, currentUser, onSettle }) {
+function BalanceSummary({ balances, simplified, currentUser, onSettle, onShowBreakdown }) {
   return (
     <div className="card mb-lg">
       <div className="card-header">
         <h3>Balances</h3>
-        <button className="btn btn-secondary btn-sm" id="settle-btn" onClick={onSettle}>
-          Record Settlement
-        </button>
+        <div className="flex gap-sm">
+          <button className="btn btn-secondary btn-sm" onClick={onShowBreakdown}>
+            My Trace
+          </button>
+          <button className="btn btn-secondary btn-sm" id="settle-btn" onClick={onSettle}>
+            Record Settlement
+          </button>
+        </div>
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
@@ -130,12 +136,14 @@ export default function GroupDetailPage() {
   const [expenses, setExpenses] = useState([]);
   const [balances, setBalances] = useState([]);
   const [simplified, setSimplified] = useState([]);
+  const [settlements, setSettlements] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const [showExpenseModal, setShowExpenseModal] = useState(false);
   const [showAddMemberModal, setShowAddMemberModal] = useState(false);
   const [showSettleModal, setShowSettleModal] = useState(false);
   const [showImportWizard, setShowImportWizard] = useState(false);
+  const [showBreakdownModal, setShowBreakdownModal] = useState(false);
 
   const groupId = parseInt(id);
 
@@ -146,15 +154,17 @@ export default function GroupDetailPage() {
 
   async function loadAll() {
     try {
-      const [gRes, eRes, bRes] = await Promise.all([
+      const [gRes, eRes, bRes, sRes] = await Promise.all([
         groupsApi.get(groupId),
         expensesApi.list(groupId),
         balancesApi.get(groupId),
+        settlementsApi.list(groupId),
       ]);
       setGroup(gRes.data);
       setExpenses(eRes.data);
       setBalances(bRes.data.balances);
       setSimplified(bRes.data.simplified_transactions);
+      setSettlements(sRes.data);
     } catch (err) {
       if (err.response?.status === 403) navigate('/dashboard');
     } finally {
@@ -182,6 +192,17 @@ export default function GroupDetailPage() {
       loadAll();
     } catch {
       toastError('Failed to delete expense');
+    }
+  };
+
+  const handleDeleteSettlement = async (settlementId) => {
+    if (!confirm('Delete this settlement?')) return;
+    try {
+      await settlementsApi.delete(groupId, settlementId);
+      success('Settlement deleted');
+      loadAll();
+    } catch (err) {
+      toastError(err.response?.data?.detail || 'Failed to delete settlement');
     }
   };
 
@@ -260,10 +281,11 @@ export default function GroupDetailPage() {
         simplified={simplified}
         currentUser={user?.username}
         onSettle={() => setShowSettleModal(true)}
+        onShowBreakdown={() => setShowBreakdownModal(true)}
       />
 
       {/* Expenses Table */}
-      <div className="card">
+      <div className="card mb-lg">
         <div className="card-header">
           <h3>Expenses ({expenses.length})</h3>
         </div>
@@ -297,14 +319,71 @@ export default function GroupDetailPage() {
         )}
       </div>
 
-      {/* Modals */}
-      {showImportWizard && (
-        <ImportWizard
-          group={group}
-          onClose={() => setShowImportWizard(false)}
-          onComplete={() => { setShowImportWizard(false); loadAll(); }}
-        />
+      {/* Settlements Table */}
+      {settlements.length > 0 && (
+        <div className="card">
+          <div className="card-header">
+            <h3>Settlement History</h3>
+          </div>
+          <div className="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Paid By</th>
+                  <th>Paid To</th>
+                  <th>Amount</th>
+                  <th>Notes</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {settlements.map((s) => (
+                  <tr key={s.id}>
+                    <td className="text-sm text-muted">{s.settlement_date}</td>
+                    <td>{s.paid_by.username}</td>
+                    <td>{s.paid_to.username}</td>
+                    <td>
+                      <span className="font-mono" style={{ color: 'var(--accent)', fontWeight: 600 }}>
+                        {s.currency === 'INR' ? '₹' : '$'}{parseFloat(s.amount).toFixed(0)}
+                      </span>
+                    </td>
+                    <td className="text-sm text-muted">{s.notes}</td>
+                    <td>
+                      {s.paid_by.username === user?.username && (
+                        <button
+                          className="btn btn-danger btn-sm"
+                          onClick={() => handleDeleteSettlement(s.id)}
+                        >
+                          Delete
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
       )}
+
+      {/* Modals */}
+        {showImportWizard && (
+          <ImportWizard
+            group={group}
+            onClose={() => setShowImportWizard(false)}
+            onComplete={() => {
+              setShowImportWizard(false);
+              loadAll();
+            }}
+          />
+        )}
+        {showBreakdownModal && (
+          <BalanceBreakdownModal
+            groupId={groupId}
+            onClose={() => setShowBreakdownModal(false)}
+          />
+        )}
       {showExpenseModal && (
         <ExpenseModal
           group={group}

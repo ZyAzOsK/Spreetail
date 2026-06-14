@@ -226,18 +226,21 @@ def parse_split_details(raw: str) -> dict:
     return result
 
 
-def check_name(name: str, group_members: set) -> Optional[DetectedAnomaly]:
-    """Check if name is in group members (case-insensitive). Flag variants."""
+def check_name(name: str, group_members: set) -> tuple[Optional[str], Optional[DetectedAnomaly]]:
+    """
+    Check if name is in group members (case-insensitive). Flag variants.
+    Returns (canonical_name_or_None, anomaly_or_None).
+    """
     if not name:
-        return None
+        return None, None
     normalized = normalize_name(name)
     lower = normalized.lower()
 
     if lower in {m.lower() for m in group_members}:
+        canonical = next(m for m in group_members if m.lower() == lower)
         if normalized not in group_members:
             # Capitalization variant
-            canonical = next(m for m in group_members if m.lower() == lower)
-            return DetectedAnomaly(
+            return canonical, DetectedAnomaly(
                 anomaly_type='name_mismatch', severity='info',
                 field_name='paid_by',
                 description=f'Name "{name}" normalized to "{canonical}".',
@@ -245,12 +248,12 @@ def check_name(name: str, group_members: set) -> Optional[DetectedAnomaly]:
                 suggested_value=canonical,
                 auto_fixed=True,
             )
-        return None
+        return canonical, None
 
     # Check trailing space (e.g. "rohan ")
     if name.strip().lower() in {m.lower() for m in group_members}:
         canonical = next(m for m in group_members if m.lower() == name.strip().lower())
-        return DetectedAnomaly(
+        return canonical, DetectedAnomaly(
             anomaly_type='name_mismatch', severity='info',
             field_name='paid_by',
             description=f'Name "{name}" has extra whitespace. Auto-corrected to "{canonical}".',
@@ -263,7 +266,7 @@ def check_name(name: str, group_members: set) -> Optional[DetectedAnomaly]:
     first_word = name.strip().split()[0].lower() if name.strip() else ''
     if first_word in {m.lower() for m in group_members}:
         canonical = next(m for m in group_members if m.lower() == first_word)
-        return DetectedAnomaly(
+        return canonical, DetectedAnomaly(
             anomaly_type='name_mismatch', severity='warning',
             field_name='paid_by',
             description=f'Name "{name}" looks like a variant of "{canonical}" (extra surname?). '
@@ -274,12 +277,12 @@ def check_name(name: str, group_members: set) -> Optional[DetectedAnomaly]:
         )
 
     # Completely unknown
-    return DetectedAnomaly(
-        anomaly_type='name_mismatch', severity='error',
+    return None, DetectedAnomaly(
+        anomaly_type='name_mismatch', severity='warning',
         field_name='paid_by',
         description=f'Name "{name}" is not a recognized group member.',
         original_value=name,
-        suggested_action='Remove this row or correct the name.',
+        suggested_action='Will auto-create and add member to group on import.',
     )
 
 
@@ -333,13 +336,16 @@ def check_unequal_sum(split_details: dict, total: Decimal) -> Optional[DetectedA
     return None
 
 
-def parse_csv(csv_text: str, group_members: set = None) -> list[ParsedRow]:
+def parse_csv(csv_text: str, membership_timeline: dict = None) -> list[ParsedRow]:
     """
     Main parse function. Returns list of ParsedRow objects.
-    group_members: set of normalized usernames (Title Case) in the group.
+    membership_timeline: dict mapping normalized names (Title Case) to 
+                         {'joined_at': date|None, 'left_at': date|None}
     """
-    if group_members is None:
-        group_members = {m.title() for m in KNOWN_MEMBERS}
+    if membership_timeline is None:
+        membership_timeline = {m.title(): {'joined_at': None, 'left_at': None} for m in KNOWN_MEMBERS}
+        
+    group_members = set(membership_timeline.keys())
 
     reader = csv.DictReader(io.StringIO(csv_text.strip()))
     rows = []
@@ -435,7 +441,7 @@ def parse_csv(csv_text: str, group_members: set = None) -> list[ParsedRow]:
             row.is_valid = False
             row.needs_review = True
         else:
-            name_anomaly = check_name(paid_by_raw, group_members)
+            canonical, name_anomaly = check_name(paid_by_raw, group_members)
             if name_anomaly:
                 row.anomalies.append(name_anomaly)
                 if name_anomaly.severity == 'error':
@@ -446,7 +452,7 @@ def parse_csv(csv_text: str, group_members: set = None) -> list[ParsedRow]:
                 else:
                     row.paid_by_normalized = paid_by_raw
             else:
-                row.paid_by_normalized = normalize_name(paid_by_raw)
+                row.paid_by_normalized = canonical if canonical else normalize_name(paid_by_raw)
         row.paid_by = paid_by_raw
 
         # Split type
@@ -464,7 +470,7 @@ def parse_csv(csv_text: str, group_members: set = None) -> list[ParsedRow]:
             if "'" in name or ' ' in name.strip():
                 normalized_split_with.append(name.strip())  # Keep as-is, flag below
             else:
-                n_anomaly = check_name(name, group_members)
+                canonical, n_anomaly = check_name(name, group_members)
                 if n_anomaly and not n_anomaly.auto_fixed:
                     row.anomalies.append(DetectedAnomaly(
                         anomaly_type='name_mismatch', severity='warning',
@@ -475,10 +481,46 @@ def parse_csv(csv_text: str, group_members: set = None) -> list[ParsedRow]:
                     ))
                     row.needs_review = True
                     normalized_split_with.append(name.strip())
-                elif n_anomaly and n_anomaly.suggested_value:
-                    normalized_split_with.append(n_anomaly.suggested_value)
                 else:
-                    normalized_split_with.append(normalize_name(name))
+                    valid_name = canonical if canonical else normalize_name(name)
+                    normalized_split_with.append(valid_name)
+                    
+                    # Also check membership validity if date is parsed
+                    if row.parsed_date and valid_name in membership_timeline:
+                        mem = membership_timeline[valid_name]
+                        joined = mem.get('joined_at')
+                        left = mem.get('left_at')
+                        
+                        if joined and row.parsed_date < joined:
+                            row.anomalies.append(DetectedAnomaly(
+                                anomaly_type='membership_violation', severity='warning',
+                                field_name='split_with',
+                                description=f'"{valid_name}" joined on {joined.strftime("%d %b %Y")} which is after this expense date. Join date will be auto-backdated upon import.',
+                                original_value=name,
+                                suggested_value='Auto-backdate',
+                                auto_fixed=True,
+                            ))
+                            row.needs_review = True
+                            # Keep in split, the view will backdate the user
+                            continue
+                        
+                        if left and row.parsed_date > left:
+                            row.anomalies.append(DetectedAnomaly(
+                                anomaly_type='membership_violation', severity='warning',
+                                field_name='split_with',
+                                description=f'"{valid_name}" left on {left.strftime("%d %b %Y")} which is before this expense date. Removed from split.',
+                                original_value=name,
+                                suggested_value='Removed',
+                                auto_fixed=True,
+                            ))
+                            row.needs_review = True
+                            # Remove from normalized_split_with
+                            normalized_split_with.pop()
+                            # Also remove from split_details if present
+                            if valid_name in row.split_details:
+                                del row.split_details[valid_name]
+                            continue
+                            
         row.split_with = normalized_split_with
 
         # Split details

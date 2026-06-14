@@ -78,12 +78,17 @@ def upload_csv(request, group_id):
     except UnicodeDecodeError:
         return Response({'detail': 'Could not decode file. Make sure it is UTF-8 encoded.'}, status=status.HTTP_400_BAD_REQUEST)
 
-    # Get group members for validation
-    active_memberships = group.memberships.filter(is_active=True).select_related('user')
-    group_members = {m.user.username.title() for m in active_memberships}
+    # Get group members for validation (include all, not just active, to know historical dates)
+    all_memberships = group.memberships.select_related('user')
+    membership_timeline = {}
+    for m in all_memberships:
+        membership_timeline[m.user.username.title()] = {
+            'joined_at': m.joined_at,
+            'left_at': m.left_at,
+        }
 
     # Parse CSV
-    parsed_rows = parse_csv(csv_text, group_members=group_members)
+    parsed_rows = parse_csv(csv_text, membership_timeline=membership_timeline)
     serializable = rows_to_serializable(parsed_rows)
 
     # Count stats
@@ -316,18 +321,6 @@ def finalize_import(request, group_id, report_id):
 
         is_settlement = decision == 'settlement' or row_data.get('is_settlement', False) and decision != 'import'
 
-        # Resolve paid_by
-        paid_by_name = (row_data.get('paid_by_normalized') or row_data.get('paid_by', '')).lower()
-        payer = member_map.get(paid_by_name)
-        if not payer:
-            # Try to create/get a user with this name (guest handling)
-            try:
-                payer = User.objects.get(username__iexact=paid_by_name)
-            except User.DoesNotExist:
-                errors.append(f'Row {row_num}: Could not find user "{paid_by_name}". Skipped.')
-                skipped_rows += 1
-                continue
-
         expense_date_str = row_data.get('date')
         if not expense_date_str:
             errors.append(f'Row {row_num}: No valid date. Skipped.')
@@ -342,11 +335,41 @@ def finalize_import(request, group_id, report_id):
             skipped_rows += 1
             continue
 
+        # Resolve paid_by
+        paid_by_name = (row_data.get('paid_by_normalized') or row_data.get('paid_by', '')).strip()
+        payer = member_map.get(paid_by_name.lower())
+        if not payer:
+            payer, _ = User.objects.get_or_create(username__iexact=paid_by_name, defaults={'username': paid_by_name})
+            GroupMembership.objects.get_or_create(
+                group=group, user=payer,
+                defaults={'joined_at': expense_date, 'is_active': True}
+            )
+            member_map[paid_by_name.lower()] = payer
+        else:
+            membership = group.memberships.filter(user=payer).first()
+            if membership and membership.joined_at > expense_date:
+                membership.joined_at = expense_date
+                membership.save()
+
         # === SETTLEMENT ===
         if is_settlement:
             split_with = row_data.get('split_with', [])
-            paid_to_name = split_with[0].lower() if split_with else None
-            paid_to = member_map.get(paid_to_name) if paid_to_name else None
+            paid_to_name = split_with[0].strip() if split_with else None
+            paid_to = None
+            if paid_to_name:
+                paid_to = member_map.get(paid_to_name.lower())
+                if not paid_to:
+                    paid_to, _ = User.objects.get_or_create(username__iexact=paid_to_name, defaults={'username': paid_to_name})
+                    GroupMembership.objects.get_or_create(
+                        group=group, user=paid_to,
+                        defaults={'joined_at': expense_date, 'is_active': True}
+                    )
+                    member_map[paid_to_name.lower()] = paid_to
+                else:
+                    membership = group.memberships.filter(user=paid_to).first()
+                    if membership and membership.joined_at > expense_date:
+                        membership.joined_at = expense_date
+                        membership.save()
 
             if payer and paid_to and row_data.get('amount'):
                 Settlement.objects.create(
@@ -391,14 +414,20 @@ def finalize_import(request, group_id, report_id):
         for name in split_with_names:
             u = member_map.get(name.lower())
             if u:
+                membership = group.memberships.filter(user=u).first()
+                if membership and membership.joined_at > expense_date:
+                    membership.joined_at = expense_date
+                    membership.save()
                 participants.append(u)
             else:
-                # Guest or unknown — try to find/create
-                try:
-                    u = User.objects.get(username__iexact=name.strip())
-                    participants.append(u)
-                except User.DoesNotExist:
-                    pass  # Just skip unknown participants
+                # Auto-create guest/unknown
+                u, _ = User.objects.get_or_create(username__iexact=name.strip(), defaults={'username': name.strip()})
+                GroupMembership.objects.get_or_create(
+                    group=group, user=u,
+                    defaults={'joined_at': expense_date, 'is_active': True}
+                )
+                member_map[name.strip().lower()] = u
+                participants.append(u)
 
         if not participants:
             participants = [payer]
