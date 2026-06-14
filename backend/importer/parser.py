@@ -567,35 +567,42 @@ def parse_csv(csv_text: str, membership_timeline: dict = None) -> list[ParsedRow
             row.split_type = 'equal'  # auto fallback
 
         # Duplicate detection
-        dup_key = f"{row.description.lower().strip()}|{row.date_str.strip()}"
-        if dup_key in seen_descriptions:
-            prev_row = seen_descriptions[dup_key]
-            # Check if it's exact (same amount) or conflicting (different amount)
-            prev = next((r for r in rows if r.row_number == prev_row), None)
-            if prev and prev.amount == row.amount:
-                anomaly_desc = (
-                    f'Exact duplicate of Row {prev_row} '
-                    f'(same description, date, and amount).'
-                )
-                sev = 'error'
-            else:
-                anomaly_desc = (
-                    f'Possible duplicate of Row {prev_row} '
-                    f'(same description and date, different amount). '
-                    f'Prev: {prev.amount if prev else "?"}, Current: {row.amount}.'
-                )
-                sev = 'error'
-            row.anomalies.append(DetectedAnomaly(
-                anomaly_type='duplicate', severity=sev,
-                field_name='description',
-                description=anomaly_desc,
-                original_value=row.description,
-                suggested_action='Review both rows and keep only the correct one.',
-            ))
-            row.needs_review = True
-            row.is_valid = False
-        else:
-            seen_descriptions[dup_key] = row.row_number
+        # Improve duplicate detection to catch fuzzy matches like 'Dinner at Thalassa' vs 'Thalassa dinner'
+        # We'll consider it a duplicate if the date is the same, and they share significant words
+        desc_words = set(re.findall(r'\w+', row.description.lower())) - {'at', 'the', 'dinner', 'lunch', 'bill', 'for', 'of', 'and'}
+        
+        found_dup = False
+        for prev_key, prev_row_num in seen_descriptions.items():
+            prev_date, prev_words_str = prev_key.split('|', 1)
+            if prev_date == row.date_str.strip():
+                prev_words = set(prev_words_str.split(','))
+                # If they share any significant word, flag as duplicate
+                if desc_words & prev_words:
+                    prev = next((r for r in rows if r.row_number == prev_row_num), None)
+                    if prev and prev.amount == row.amount:
+                        anomaly_desc = f'Exact duplicate of Row {prev_row_num} (similar description, same date and amount).'
+                        sev = 'error'
+                    else:
+                        anomaly_desc = f'Possible duplicate of Row {prev_row_num} (similar description, same date, different amount). Prev: {prev.amount if prev else "?"}, Current: {row.amount}.'
+                        sev = 'warning'
+                    row.anomalies.append(DetectedAnomaly(
+                        anomaly_type='duplicate', severity=sev,
+                        field_name='description',
+                        description=anomaly_desc,
+                        original_value=row.description,
+                        suggested_action='Review both rows and keep only the correct one.',
+                    ))
+                    row.needs_review = True
+                    row.is_valid = False
+                    found_dup = True
+                    break
+        
+        if not found_dup:
+            new_key = f"{row.date_str.strip()}|{','.join(desc_words)}"
+            seen_descriptions[new_key] = row.row_number
+
+        # Check if needs_review should actually be true (ignore info severity)
+        row.needs_review = any(a.severity in ('warning', 'error', 'critical') for a in row.anomalies)
 
         rows.append(row)
 
