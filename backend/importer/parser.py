@@ -34,7 +34,7 @@ from typing import Optional
 
 
 KNOWN_MEMBERS = {
-    'aisha', 'rohan', 'priya', 'meera', 'dev', 'sam',
+    'aisha', 'rohan', 'priya', 'meera', 'sam',
 }
 
 SETTLEMENT_KEYWORDS = [
@@ -158,15 +158,14 @@ def parse_date(raw: str) -> tuple[Optional[date], Optional[DetectedAnomaly]]:
             # Check if ambiguous: day <= 12 (could be month)
             if fmt == '%d-%m-%Y' and parsed.day <= 12:
                 return parsed, DetectedAnomaly(
-                    anomaly_type='date_error', severity='warning',
+                    anomaly_type='date_error', severity='info',
                     field_name='date',
                     description=(
-                        f'Ambiguous date "{raw}". Interpreted as {parsed.strftime("%d %b %Y")} '
-                        f'(DD-MM-YYYY). Could also be {datetime.strptime(raw, "%m-%d-%Y").strftime("%d %b %Y")}.'
+                        f'Parsed using document format DD-MM-YYYY: {parsed.strftime("%d %b %Y")}.'
                     ),
                     original_value=raw,
                     suggested_value=parsed.isoformat(),
-                    suggested_action='Confirm the correct date interpretation.',
+                    auto_fixed=True,
                 )
             return parsed, None
         except ValueError:
@@ -276,13 +275,24 @@ def check_name(name: str, group_members: set) -> tuple[Optional[str], Optional[D
             auto_fixed=True,
         )
 
+    # Check if it's one of the original housemates missing from DB
+    if lower in {m.lower() for m in KNOWN_MEMBERS}:
+        return normalized, DetectedAnomaly(
+            anomaly_type='name_mismatch', severity='info',
+            field_name='paid_by',
+            description=f'Core member "{normalized}" auto-recognized.',
+            original_value=name,
+            suggested_value=normalized,
+            auto_fixed=True,
+        )
+
     # Completely unknown
     return None, DetectedAnomaly(
         anomaly_type='name_mismatch', severity='warning',
         field_name='paid_by',
-        description=f'Name "{name}" is not a recognized group member.',
+        description=f'Guest member "{name}" detected. Will be auto-created.',
         original_value=name,
-        suggested_action='Will auto-create and add member to group on import.',
+        suggested_action='Appears in expense.',
     )
 
 
@@ -472,13 +482,14 @@ def parse_csv(csv_text: str, membership_timeline: dict = None) -> list[ParsedRow
             else:
                 canonical, n_anomaly = check_name(name, group_members)
                 if n_anomaly and not n_anomaly.auto_fixed:
-                    row.anomalies.append(DetectedAnomaly(
-                        anomaly_type='name_mismatch', severity='warning',
-                        field_name='split_with',
-                        description=f'Unknown name in split_with: "{name}". May be a guest.',
-                        original_value=name,
-                        suggested_action='Confirm if this is a one-time guest or a typo.',
-                    ))
+                    if not any(a.anomaly_type == 'name_mismatch' and a.original_value.lower() == name.lower() for a in row.anomalies):
+                        row.anomalies.append(DetectedAnomaly(
+                            anomaly_type='name_mismatch', severity='warning',
+                            field_name='split_with',
+                            description=f'Guest member "{name}" detected. Will be auto-created.',
+                            original_value=name,
+                            suggested_action='Appears as participant.',
+                        ))
                     row.needs_review = True
                     normalized_split_with.append(name.strip())
                 else:
