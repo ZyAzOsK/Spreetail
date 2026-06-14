@@ -1,8 +1,10 @@
 import axios from 'axios';
 
-// All API requests go through /api (proxied to Django on port 8000)
+// All API requests go through the environment variable URL (for production) or /api (proxied to Django on port 8000)
+const baseURL = import.meta.env.VITE_API_BASE_URL || '/api';
+
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: baseURL,
   headers: { 'Content-Type': 'application/json' },
 });
 
@@ -24,7 +26,7 @@ api.interceptors.response.use(
       originalRequest._retry = true;
       try {
         const refresh = localStorage.getItem('refresh_token');
-        const { data } = await axios.post('/api/auth/token/refresh/', { refresh });
+        const { data } = await axios.post(`${baseURL}/auth/token/refresh/`, { refresh });
         localStorage.setItem('access_token', data.access);
         originalRequest.headers.Authorization = `Bearer ${data.access}`;
         return api(originalRequest);
