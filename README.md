@@ -1,117 +1,59 @@
-# FairShare — Shared Expenses App
+# Spreetail Shared Expenses App
 
-> Built for the Spreetail Software Engineering Intern assignment.  
-> A shared expenses app for flatmates with messy data, built with Django + React.
+A powerful, robust shared expenses application built for flatmates. This app allows users to import messy CSV files, detects anomalies intelligently, resolves them via a clean UI, calculates complex balances factoring in membership dates, and simplifies debt settlements. 
 
-## Live Demo
-
-**Deployed URL:** _[Will be added after deployment]_
-
-## Overview
-
-FairShare helps a group of flatmates (Aisha, Rohan, Priya, Meera, Dev, Sam) track shared expenses, import messy CSV data, detect anomalies, calculate balances, and settle debts. Built to handle real-world data problems — not just happy paths.
-
-### Key Features
-
-- **Smart CSV Import** — Detects 14+ data anomalies (duplicates, missing fields, math errors, membership violations) and surfaces them for user review
-- **Multi-Currency Support** — USD/INR conversion via ExchangeRate-API with rate caching
-- **Flexible Splitting** — Equal, unequal, percentage, and share-based expense splitting
-- **Membership Timeline** — Tracks when members join/leave — Sam's April expenses don't affect Meera's March balance
-- **Debt Simplification** — Minimizes the number of transactions needed to settle up
-- **Import Reports** — Every anomaly detected during CSV import is logged with the action taken
+## Features
+- **CSV Anomaly Detection:** Detects 17+ types of data anomalies (missing members, duplicate expenses, math errors, historic date violations) and provides actionable resolutions.
+- **Smart Importer:** Auto-backdates new members, converts currency (USD to INR), and prevents accidental data loss.
+- **Balance Calculation Engine:** Computes net balances while perfectly respecting exact membership dates (e.g. Sam joined late, Meera left early).
+- **Simplified Debts:** Reduces cyclical debts into minimal direct payments.
+- **My Trace:** A dedicated ledger tracing exactly which expenses contributed to a user's balance.
+- **Settlement Recording:** Record offline payments and watch the balances update instantly.
 
 ## Tech Stack
-
-| Layer | Technology |
-|-------|-----------|
-| Backend | Django 6.0 + Django REST Framework |
-| Frontend | React 19 (Vite) |
-| Database | SQLite (dev) / PostgreSQL (prod) |
-| Auth | JWT (djangorestframework-simplejwt) |
-| Styling | Vanilla CSS (Spreetail-inspired dark theme) |
-| Animations | GSAP |
-| Currency API | ExchangeRate-API |
-| Deployment | Render.com |
+- **Frontend:** React + Vite
+- **Backend:** Django + Django REST Framework (DRF)
+- **Database:** SQLite (local development) / PostgreSQL (production ready)
+- **Styling:** Vanilla CSS with a polished Spreetail Dark Theme
+- **Animations:** GSAP for smooth scroll reveals and UI interactions.
 
 ## Setup Instructions
 
 ### Prerequisites
-
-- Python 3.12+
+- Python 3.10+
 - Node.js 20+
-- npm 10+
 
-### Backend Setup
-
+### 1. Backend Setup (Django)
 ```bash
 cd backend
 python3 -m venv venv
-source venv/bin/activate    # On Windows: venv\Scripts\activate
+source venv/bin/activate
 pip install -r requirements.txt
-
-# Create .env file
-cp .env.example .env
-# Edit .env and add your EXCHANGE_RATE_API_KEY
-
-# Run migrations
+python manage.py makemigrations
 python manage.py migrate
-
-# Create superuser (optional)
-python manage.py createsuperuser
-
-# Start dev server
 python manage.py runserver
 ```
 
-### Frontend Setup
-
+### 2. Frontend Setup (React/Vite)
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
 
-### Environment Variables
+### 3. Usage
+1. Open `http://localhost:5173/` in your browser.
+2. Register a new user (e.g., Aisha) and log in.
+3. Create a Group (e.g., "Spreetail Flatmates").
+4. Click **Import CSV** inside the group.
+5. Upload the `Expenses Export.csv` file from the root folder.
+6. The app will detect anomalies and present an interactive UI to review them. Proceed through the wizard to finalize the import.
+7. Click **My Trace** to view expense breakdowns or **Record Settlement** to log payments!
 
-Create a `backend/.env` file:
+## Documentation Links
+- [SCOPE.md](./SCOPE.md) - Contains the complete anomaly log, handling policies, and DB schema.
+- [DECISIONS.md](./DECISIONS.md) - Explains all significant technical decisions and rationales.
+- [AI_USAGE.md](./AI_USAGE.md) - Details AI usage, key prompts, and 3 specific cases where AI produced incorrect outputs that had to be corrected.
 
-```env
-DEBUG=True
-DJANGO_SECRET_KEY=your-secret-key-here
-EXCHANGE_RATE_API_KEY=your-exchangerate-api-key
-ALLOWED_HOSTS=localhost,127.0.0.1
-CORS_ALLOWED_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
-```
-
-## AI Tools Used
-
-See [AI_USAGE.md](./AI_USAGE.md) for detailed documentation of AI tools used, key prompts, and cases where AI produced incorrect output.
-
-**Primary tool:** Claude (Anthropic) — used as a development collaborator for architecture decisions, code generation, and debugging. Every line was reviewed and understood by the developer.
-
-## Project Structure
-
-```
-├── backend/              # Django REST API
-│   ├── accounts/         # User authentication
-│   ├── groups/           # Group management
-│   ├── expenses/         # Expense CRUD + balance engine
-│   ├── importer/         # CSV import + anomaly detection
-│   └── config/           # Django settings
-├── frontend/             # React (Vite) SPA
-│   └── src/
-│       ├── components/   # Reusable UI components
-│       ├── pages/        # Page-level components
-│       ├── services/     # API client
-│       └── styles/       # CSS
-├── SCOPE.md              # Anomaly log + database schema
-├── DECISIONS.md          # Decision log
-├── AI_USAGE.md           # AI usage documentation
-└── Expenses Export.csv   # Original data file
-```
-
-## Other Documentation
-
-- [SCOPE.md](./SCOPE.md) — Every data anomaly found and how it was handled + database schema
-- [DECISIONS.md](./DECISIONS.md) — Each significant decision with options considered
-- [AI_USAGE.md](./AI_USAGE.md) — AI tools, prompts, and error cases
+## Deployment Notes
+This project is configured to be seamlessly deployed. The Django backend uses `django-cors-headers` and is ready for Render/Railway deployment, and the Vite frontend can be built via `npm run build` and served as static files, or deployed independently to Vercel/Netlify.

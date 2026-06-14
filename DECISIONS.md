@@ -1,172 +1,44 @@
-# DECISIONS.md — Decision Log
+# Architecture & Design Decisions
 
-> Each significant design and engineering decision, the options considered, and why the chosen option was selected.
+This document logs all the significant technical and product decisions made during the development of the Spreetail Shared Expenses App. 
 
----
+## 1. Tech Stack Selection
+**Decision:** React (Vite) for the frontend + Django REST Framework (DRF) for the backend.
+**Options Considered:** 
+- Next.js (Full-stack)
+- Django (Full-stack with HTML templates)
+- React + DRF
+**Rationale:** The assignment specifically mentioned React for the frontend and Django as a plus for the backend. While Next.js is popular, using Vite + React creates a completely decoupled Single Page Application (SPA). This strictly enforces an API-first approach on the backend. This is highly beneficial because the frontend React components can eventually be shared in a Monorepo setup to build a React Native mobile app utilizing the exact same Django API endpoints.
 
-## Decision 1: Tech Stack — Frontend Framework
+## 2. Dealing with Unknown "Guest" Members
+**Decision:** Unrecognized names in the CSV (like "Dev's friend Kabir" or "Priya S") trigger an automatic backend User and GroupMembership provisioning.
+**Options Considered:**
+1. Throw an error and force the user to manually add the member before importing.
+2. Store guests as string fields on the Expense table.
+3. Silently auto-create them as full members.
+**Rationale:** The first option creates a massive UX bottleneck (the user has to abort the import, navigate away, add the member, and restart). The second option ruins the database normalization and makes balance algorithms a nightmare. We chose Option 3 because it allows the app to cleanly integrate the guest into the exact same Balance engine. The app sets their `joined_at` date dynamically to match the expense date, ensuring accurate historic tracking.
 
-**Context:** Need a React-based frontend that can later be adapted for a React Native mobile app.
+## 3. The Auto-Fixing Policy
+**Decision:** Some anomalies (like invalid dates `Mar-14` or extra decimal places `899.995`) are auto-fixed behind the scenes without demanding user intervention, but they are still flagged in the audit report. Major anomalies (like Duplicate Expenses) require explicit user approval.
+**Options Considered:**
+1. Strict parsing (Fail the whole CSV if one row is bad).
+2. Completely silent auto-fixing.
+**Rationale:** Meera's specific assignment requirement was: *"Clean up the duplicates — but I want to approve anything the app deletes or changes."* To respect this, anything that requires discarding data (like duplicate rows or missing members) forces the user to explicitly click "Skip" or "Import". Safe parsing assumptions (like Bankers Rounding for fractional cents) are auto-fixed to streamline the UX, but they are visually tagged with a yellow `[Warning]` badge in the UI so the user is still technically approving the change by finalizing the import.
 
-| Option | Pros | Cons |
-|--------|------|------|
-| **Next.js** | SSR, SEO, file-based routing | Web-only, no native mobile support, SSR overkill for SPA |
-| **Vite + React** (chosen) | Fast dev server, simple config, clean separation | No SSR (not needed here) |
-| **Expo Router** | Universal (web + mobile) | Premature for web-first assignment, learning curve |
+## 4. Resolving the "04-05-2026" Date Ambiguity
+**Decision:** Interpreted as May 4th, 2026 (DD-MM-YYYY).
+**Options Considered:**
+- April 5th (MM-DD-YYYY)
+- Prompt the user to type the correct date.
+**Rationale:** Every single other row in the CSV file strictly adheres to the DD-MM-YYYY format. When writing parsers, inferring format consistency from the document context is standard practice. Furthermore, in the row timeline, Row 34 falls squarely between mid-April entries and mid-May entries, making May 4th the most logically sound chronological interpretation.
 
-**Decision:** Vite + React. The assignment is a web app. Vite gives fast HMR and simple bundling. The component architecture can later be shared with a React Native app via a monorepo with `packages/shared`.
+## 5. Currency Exchange Strategy
+**Decision:** Exchange rates are fetched live via a free API (`ExchangeRate-API`) and multiplied dynamically at calculation time, standardizing all internal group balances to INR.
+**Options Considered:**
+- Hardcode an exchange rate (e.g. 1 USD = 83 INR).
+- Prompt the user for the exchange rate on every import.
+**Rationale:** Priya explicitly noted *"a dollar is not a rupee"*. Hardcoding a rate fails immediately if the user uploads a CSV from a different year. The backend is configured to pull the latest exchange rate and cache it in the `CurrencyRate` table. 
 
----
-
-## Decision 2: Tech Stack — Backend Framework
-
-**Context:** Assignment specifically mentions Django as a plus. Need REST APIs and relational DB support.
-
-| Option | Pros | Cons |
-|--------|------|------|
-| **Django + DRF** (chosen) | Assignment mentions Django, excellent ORM, built-in admin, DRF for clean APIs | Heavier than Express |
-| **Express.js + Prisma** | Lightweight, JS everywhere | Assignment values Python/Django |
-| **FastAPI** | Modern, async, fast | Less mature ORM, less assignment alignment |
-
-**Decision:** Django + Django REST Framework. Directly aligns with the role requirements. Django ORM makes complex queries (balance calculations, membership-date filtering) readable and maintainable.
-
----
-
-## Decision 3: Authentication Strategy
-
-**Context:** App needs user login. Question is how complex.
-
-| Option | Pros | Cons |
-|--------|------|------|
-| **JWT (SimpleJWT)** (chosen) | Stateless, API-friendly, works well with React SPA | Token management on client |
-| **Session auth** | Simpler server-side | Requires CSRF handling, less API-friendly |
-| **OAuth/Social** | User convenience | Overkill, external dependency, setup time |
-
-**Decision:** JWT via `djangorestframework-simplejwt`. Stateless auth fits our API-first architecture. 12-hour access token with 7-day refresh token provides good UX without security risk.
-
----
-
-## Decision 4: Currency Conversion — Fixed Rate vs Live API
-
-**Context:** CSV has USD expenses. Need to convert for balance calculations.
-
-| Option | Pros | Cons |
-|--------|------|------|
-| **Fixed rate (₹83/USD)** | Simple, deterministic, explainable | Inaccurate for real use, doesn't demonstrate API skills |
-| **ExchangeRate-API** (chosen) | Real rates, demonstrates API integration, free tier (1500/mo) | External dependency, needs fallback |
-
-**Decision:** ExchangeRate-API with fallback to ₹83/$1 if API is unavailable. Rates are cached per date in the `CurrencyRate` table to avoid redundant API calls. Demonstrates real-world integration skills while maintaining reliability.
-
----
-
-## Decision 5: Database — SQLite vs PostgreSQL
-
-**Context:** Assignment requires relational DB. Need both dev convenience and production readiness.
-
-| Option | Pros | Cons |
-|--------|------|------|
-| **SQLite (dev) + PostgreSQL (prod)** (chosen) | Zero-config dev, production-grade prod | Minor behavior differences |
-| **PostgreSQL everywhere** | Consistency | Requires local Postgres setup |
-| **SQLite only** | Simplest | Not production-ready at scale |
-
-**Decision:** SQLite for local development (zero setup), PostgreSQL for Render.com deployment. `dj-database-url` makes switching seamless via `DATABASE_URL` environment variable.
-
----
-
-## Decision 6: How to Handle Duplicate Expenses
-
-**Context:** CSV has two types of duplicates — exact duplicates (Rows 5-6) and conflicting duplicates (Rows 24-25 with different amounts).
-
-| Option | Pros | Cons |
-|--------|------|------|
-| **Auto-delete duplicates** | Fast import | Violates Meera's request ("I want to approve anything the app deletes") |
-| **Flag for user review** (chosen) | Transparent, user has control | Slower import for messy data |
-| **Keep both, mark as possible dups** | No data loss | Inflates expenses, confusing balances |
-
-**Decision:** Flag duplicates and present to user for review. For exact duplicates (same amount), suggest keeping the one with more context (notes). For conflicting duplicates (different amounts), show both and let user decide. This directly addresses Meera's requirement.
-
----
-
-## Decision 7: Percentage Splits That Don't Sum to 100%
-
-**Context:** Rows 15 and 32 have percentage splits summing to 110% (30+30+30+20).
-
-| Option | Pros | Cons |
-|--------|------|------|
-| **Reject the row** | Safe | Loses data |
-| **Normalize proportionally** (chosen) | Preserves relative intent | Alters original percentages |
-| **Clip to 100% (reduce last person)** | Simple | Unfair to last person |
-
-**Decision:** Flag as a math error and suggest proportional normalization (divide each by 1.1). Show both original and suggested percentages. Let user approve or modify. This preserves the payer's intent while correcting the error.
-
----
-
-## Decision 8: Rounding Strategy for Expense Splits
-
-**Context:** When splitting ₹100 among 3 people, you get ₹33.33... — where does the remaining paisa go?
-
-| Option | Pros | Cons |
-|--------|------|------|
-| **Remainder to payer** (chosen) | Simple, consistent, payer bears rounding cost | Payer always slightly disadvantaged |
-| **Banker's rounding** | Statistically fair | Complex, harder to explain |
-| **Round up last person** | Simple | Last person always pays more |
-
-**Decision:** Round each share down to 2 decimal places. Assign any remainder (difference between sum of shares and total) to the payer's share. Example: ₹100 ÷ 3 = ₹33.33 each → payer's share becomes ₹33.34. This is simple, consistent, and easy to explain in the interview.
-
----
-
-## Decision 9: Handling the Ambiguous Date (Row 34)
-
-**Context:** `04-05-2026` with note "is this April 5 or May 4? format is a mess"
-
-| Option | Pros | Cons |
-|--------|------|------|
-| **Always DD-MM-YYYY** (chosen) | Consistent with all other dates in CSV | Might be wrong for this specific row |
-| **Always MM-DD-YYYY** | Follows US convention | Inconsistent with all other rows |
-| **Flag for user decision** | User picks | Import paused |
-
-**Decision:** Default interpretation as DD-MM-YYYY (4th May 2026), consistent with every other date in the CSV. But flag it as an ambiguous date anomaly and show both interpretations to the user during import review. This respects consistency while giving the user final say.
-
----
-
-## Decision 10: Handling the Negative Amount (Row 26: -30 USD Refund)
-
-**Context:** Parasailing refund of `-30 USD`. Is this an error or a valid reversal?
-
-| Option | Pros | Cons |
-|--------|------|------|
-| **Reject negative amounts** | Safe | Loses legitimate refund data |
-| **Treat as refund/reversal** (chosen) | Correct interpretation (note confirms "one slot got cancelled") | Requires negative-amount handling in balance engine |
-
-**Decision:** Treat as a legitimate refund. The negative amount creates negative splits — each participant gets credited their share of the refund. The balance engine handles this by simply summing all splits (positive and negative). This is the correct real-world behavior.
-
----
-
-## Decision 11: Guest Members (Kabir)
-
-**Context:** Row 23 includes "Dev's friend Kabir" who is not a regular flatmate.
-
-| Option | Pros | Cons |
-|--------|------|------|
-| **Create as full user** | Simple | Pollutes member list |
-| **Create as guest/temporary** (chosen) | Clean separation, one-time participant | Need guest concept |
-| **Ignore Kabir's share** | Simple | Incorrect balance calculation |
-
-**Decision:** Create Kabir as a regular user (for data integrity) but don't add him as a group member. He only appears in the ExpenseSplit for that one parasailing expense. This keeps the member list clean while correctly splitting the expense 5 ways.
-
----
-
-## Decision 12: Sam's Deposit (Row 38)
-
-**Context:** "Sam deposit share" — Sam paid Aisha ₹15,000. This is a security deposit transfer, not a shared expense.
-
-| Option | Pros | Cons |
-|--------|------|------|
-| **Import as regular expense** | Simple | Incorrect — would affect group balances |
-| **Reclassify as settlement** (chosen) | Correct financial treatment | Need to detect deposit transactions |
-
-**Decision:** Flag as a potential settlement/transfer. Sam paying Aisha his deposit share is a financial transfer between two people, not a group expense. Import as a Settlement record (Sam → Aisha, ₹15,000) rather than an Expense.
-
----
-
-_More decisions will be added as they arise during development._
+## 6. Debt Simplification Algorithm
+**Decision:** A greedy algorithm that matches the highest creditor with the highest debtor to minimize transaction counts.
+**Rationale:** If A owes B ₹100, and B owes C ₹100, making two transactions is highly inefficient. The Balance Engine creates a net total for every user. Those with positive balances are put in a `creditors` pool, and negative balances in a `debtors` pool. The algorithm loops and greedily settles the largest debts first, ensuring that no user has to make more than 1 or 2 payments to clear their balances.
