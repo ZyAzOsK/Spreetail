@@ -175,13 +175,19 @@ def get_user_balance_breakdown(group, user):
         if not user_split:
             continue
 
+        if expense.currency == 'INR':
+            split_inr = user_split.share_amount
+        else:
+            rate = CurrencyRate.get_rate(expense.currency, 'INR', expense.expense_date)
+            split_inr = (user_split.share_amount * rate).quantize(Decimal('0.01'))
+
         is_payer = expense.paid_by_id == user.id
         if is_payer:
             # User paid — others owe them
-            net_for_user = expense.amount_in_inr - user_split.share_amount
+            net_for_user = expense.amount_in_inr - split_inr
         else:
             # User owes the payer
-            net_for_user = -user_split.share_amount
+            net_for_user = -split_inr
 
         breakdown.append({
             'expense_id': expense.id,
@@ -190,9 +196,40 @@ def get_user_balance_breakdown(group, user):
             'total': str(expense.amount),
             'currency': expense.currency,
             'paid_by': expense.paid_by.username,
-            'your_share': str(user_split.share_amount),
+            'your_share': str(split_inr),
             'you_paid': is_payer,
             'net_effect': str(net_for_user),  # positive = good for you, negative = you owe
         })
+
+    settlements = Settlement.objects.filter(
+        group=group
+    ).filter(
+        Q(paid_by=user) | Q(paid_to=user)
+    ).select_related('paid_by', 'paid_to')
+
+    for s in settlements:
+        if s.currency == 'INR':
+            amount_inr = s.amount
+        else:
+            rate = CurrencyRate.get_rate(s.currency, 'INR', s.settlement_date)
+            amount_inr = (s.amount * rate).quantize(Decimal('0.01'))
+
+        is_payer = s.paid_by_id == user.id
+        net_for_user = amount_inr if is_payer else -amount_inr
+
+        breakdown.append({
+            'expense_id': f'settlement_{s.id}',
+            'description': f'Settlement: {s.paid_by.username} → {s.paid_to.username}',
+            'date': str(s.settlement_date),
+            'total': str(s.amount),
+            'currency': s.currency,
+            'paid_by': s.paid_by.username,
+            'your_share': '0.00',
+            'you_paid': is_payer,
+            'net_effect': str(net_for_user),
+        })
+
+    # Sort the breakdown chronologically
+    breakdown.sort(key=lambda x: x['date'], reverse=True)
 
     return breakdown
