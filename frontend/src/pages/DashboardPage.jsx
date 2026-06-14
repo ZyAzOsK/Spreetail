@@ -148,7 +148,7 @@ export default function DashboardPage() {
         <button
           className="btn btn-primary btn-sm"
           id="new-group-btn"
-          onClick={() => navigate('/groups/new')}
+          onClick={() => navigate('/groups', { state: { openCreate: true } })}
         >
           + New Group
         </button>

@@ -137,6 +137,11 @@ export default function GroupDetailPage() {
 
   const groupId = parseInt(id);
 
+  // Guard: if id is not a valid number, redirect to groups list
+  useEffect(() => {
+    if (isNaN(groupId)) navigate('/groups', { replace: true });
+  }, [groupId, navigate]);
+
   async function loadAll() {
     try {
       const [gRes, eRes, bRes] = await Promise.all([

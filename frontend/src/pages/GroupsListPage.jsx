@@ -1,16 +1,18 @@
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { gsap } from 'gsap';
 import { useToast } from '../context/ToastContext';
 import { groupsApi } from '../services/api';
 
 export default function GroupsListPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { success, error: toastError } = useToast();
   const pageRef = useRef(null);
   const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [showCreate, setShowCreate] = useState(false);
+  // Auto-open create form if navigated from Dashboard's New Group button
+  const [showCreate, setShowCreate] = useState(location.state?.openCreate === true);
   const [form, setForm] = useState({ name: '', description: '' });
   const [creating, setCreating] = useState(false);
 
