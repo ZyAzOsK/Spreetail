@@ -58,3 +58,4 @@ backend/.env
 Thumbs.db
 *.bak
 *.tmp
+INTERVIEW_PREP.md
