@@ -177,12 +177,12 @@ def parse_date(raw: str) -> tuple[Optional[date], Optional[DetectedAnomaly]]:
             parsed_no_year = datetime.strptime(raw, fmt)
             guessed = parsed_no_year.replace(year=2026).date()
             return guessed, DetectedAnomaly(
-                anomaly_type='date_error', severity='warning',
+                anomaly_type='date_error', severity='info',
                 field_name='date',
                 description=f'Date "{raw}" is missing a year. Assumed 2026: {guessed.isoformat()}.',
                 original_value=raw,
                 suggested_value=guessed.isoformat(),
-                suggested_action='Confirm the correct year.',
+                auto_fixed=True,
             )
         except ValueError:
             continue
@@ -268,11 +268,11 @@ def check_name(name: str, group_members: set) -> tuple[Optional[str], Optional[D
         return canonical, DetectedAnomaly(
             anomaly_type='name_mismatch', severity='warning',
             field_name='paid_by',
-            description=f'Name "{name}" looks like a variant of "{canonical}" (extra surname?). '
-                        f'Auto-corrected to "{canonical}".',
+            description=f'Name "{name}" looks like a variant of "{canonical}" (extra surname?).',
             original_value=name,
             suggested_value=canonical,
-            auto_fixed=True,
+            suggested_action=f'Confirm to merge with "{canonical}".',
+            auto_fixed=False,
         )
 
     # Check if it's one of the original housemates missing from DB
@@ -421,6 +421,7 @@ def parse_csv(csv_text: str, membership_timeline: dict = None) -> list[ParsedRow
                     suggested_action='Skip or correct this row.',
                 ))
                 row.needs_review = True
+                row.is_valid = False
 
         # Currency
         currency_raw = raw_row.get('currency', '').strip()
