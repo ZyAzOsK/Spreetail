@@ -825,6 +825,21 @@ tbody td {
   margin-bottom: var(--sp-md);
 }
 
+.auth-alert {
+  background: rgba(144, 202, 249, 0.05);
+  border: 1px solid rgba(144, 202, 249, 0.2);
+  border-radius: var(--radius-md);
+  padding: var(--sp-md);
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  margin-bottom: var(--sp-md);
+  line-height: 1.5;
+}
+
+.auth-alert strong {
+  color: var(--accent);
+}
+
 /* === STAT CARDS === */
 .stat-grid {
   display: grid;

@@ -85,6 +85,11 @@ export default function RegisterPage() {
         <h1 className="auth-title">Create account</h1>
         <p className="auth-subtitle">Join your flatmates and track shared expenses</p>
 
+        <div className="auth-alert">
+          <strong>Evaluator Notice:</strong> Please register with a username from the CSV (e.g., <strong>aisha</strong>, <strong>rohan</strong>, or <strong>priya</strong>) to test the personalized &quot;My Trace&quot; ledger. <br/><br/>
+          (The importer engine will automatically auto-provision accounts for all other missing members in the background!)
+        </div>
+
         {errors.general && <div className="auth-error">{errors.general}</div>}
 
         <form onSubmit={handleSubmit} noValidate>

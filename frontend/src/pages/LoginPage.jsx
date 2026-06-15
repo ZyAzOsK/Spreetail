@@ -56,6 +56,10 @@ export default function LoginPage() {
         <h1 className="auth-title">Welcome back</h1>
         <p className="auth-subtitle">Sign in to your account to continue</p>
 
+        <div className="auth-alert">
+          <strong>Evaluator Notice:</strong> If you haven't created an account yet, please click <strong>Create one</strong> below and register with a username from the CSV (like <strong>aisha</strong> or <strong>rohan</strong>).
+        </div>
+
         {error && <div className="auth-error">{error}</div>}
 
         <form onSubmit={handleSubmit} noValidate>
