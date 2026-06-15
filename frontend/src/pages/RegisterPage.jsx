@@ -87,7 +87,7 @@ export default function RegisterPage() {
 
         <div className="auth-alert">
           <strong>Evaluator Notice:</strong> Please register with a username from the CSV (e.g., <strong>aisha</strong>, <strong>rohan</strong>, or <strong>priya</strong>) to test the personalized &quot;My Trace&quot; ledger. <br/><br/>
-          (The importer engine will automatically auto-provision accounts for all other missing members in the background!)
+          (If a name is already taken by another tester, try <strong>meera</strong> or <strong>sam</strong>. If you use a custom name, the app will still work perfectly and auto-provision the flatmates, but you won't see personal balances.)
         </div>
 
         {errors.general && <div className="auth-error">{errors.general}</div>}

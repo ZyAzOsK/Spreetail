@@ -57,7 +57,8 @@ export default function LoginPage() {
         <p className="auth-subtitle">Sign in to your account to continue</p>
 
         <div className="auth-alert">
-          <strong>Evaluator Notice:</strong> If you haven't created an account yet, please click <strong>Create one</strong> below and register with a username from the CSV (like <strong>aisha</strong> or <strong>rohan</strong>).
+          <strong>Evaluator Notice:</strong> If you haven't created an account yet, please click <strong>Create one</strong> below and register with a username from the CSV (like <strong>aisha</strong> or <strong>rohan</strong>). <br/><br/>
+          (If a name is taken, simply try another flatmate like <strong>meera</strong> or <strong>sam</strong>!)
         </div>
 
         {error && <div className="auth-error">{error}</div>}
