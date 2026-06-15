@@ -61,7 +61,7 @@ If you are evaluating this assignment, here is exactly how to run through the co
 
 1. **Start the Servers**: Make sure both `python manage.py runserver` (backend) and `npm run dev` (frontend) are running.
 2. **Access the App**: Open your browser and go to `http://localhost:5173/`.
-3. **Login**: Click "Register" and create an account for yourself (e.g., Username: "Aisha"). Then log in.
+3. **Login**: Click "Register" and create an account. **Important:** You should register with a username from the CSV (e.g., `"Aisha"`, `"Rohan"`, or `"Priya"`). This ensures you are tied to the imported expenses and can test the "My Trace" ledger. (Don't worry about the other members—when you upload the CSV, the Importer Engine will magically auto-provision accounts for Sam, Meera, Dev, etc. behind the scenes!)
 4. **Create a Group**: Click the **"+ New Group"** button. Name it "Spreetail Flatmates".
 5. **Import the Messy Data**:
    - Open your newly created group.
