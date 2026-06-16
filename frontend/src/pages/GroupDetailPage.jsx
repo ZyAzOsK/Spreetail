@@ -206,7 +206,19 @@ export default function GroupDetailPage() {
     }
   };
 
+  const handleDeleteGroup = async () => {
+    if (!confirm(`Are you sure you want to delete "${group.name}"? This will permanently remove all expenses, settlements, and members. This action cannot be undone.`)) return;
+    try {
+      await groupsApi.delete(groupId);
+      success('Group deleted');
+      navigate('/dashboard');
+    } catch (err) {
+      toastError(err.response?.data?.detail || 'Failed to delete group');
+    }
+  };
+
   const activeMembers = group?.memberships?.filter((m) => m.is_active) || [];
+  const isCreator = group?.created_by?.id === user?.id;
 
   if (loading) {
     return (
@@ -252,6 +264,15 @@ export default function GroupDetailPage() {
           >
             + Expense
           </button>
+          {isCreator && (
+            <button
+              className="btn btn-danger btn-sm"
+              id="delete-group-btn"
+              onClick={handleDeleteGroup}
+            >
+              🗑 Delete Group
+            </button>
+          )}
         </div>
       </div>
 

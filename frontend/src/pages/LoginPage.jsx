@@ -6,7 +6,7 @@ import { gsap } from 'gsap';
 export default function LoginPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
-  const [form, setForm] = useState({ username: '', password: '' });
+  const [form, setForm] = useState({ username: 'aisha', password: 'aisha123' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const cardRef = useRef(null);
@@ -57,8 +57,8 @@ export default function LoginPage() {
         <p className="auth-subtitle">Sign in to your account to continue</p>
 
         <div className="auth-alert">
-          <strong>Evaluator Notice:</strong> If you haven't created an account yet, please click <strong>Create one</strong> below and register with a username from the CSV (like <strong>aisha</strong> or <strong>rohan</strong>). <br/><br/>
-          (If a name is taken, simply try another flatmate like <strong>meera</strong> or <strong>sam</strong>!)
+          <strong>Evaluator Notice:</strong> A demo account is pre-filled below. Just click <strong>Sign In</strong> to explore!<br/><br/>
+          <strong>Username:</strong> aisha &nbsp;|&nbsp; <strong>Password:</strong> aisha123
         </div>
 
         {error && <div className="auth-error">{error}</div>}
